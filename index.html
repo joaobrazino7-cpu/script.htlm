@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hub de Scripts Multi-Linguagem</title>
+    <!-- Inclui Tailwind CSS para estilo -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f5f5dc; /* Fundo bege claro */
+            color: #1a202c; /* Cor do texto mais escura para contraste */
+        }
+        .main-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem;
+            min-height: 100vh;
+        }
+        .app-card {
+            background-color: #ffffff; /* Fundo branco e limpo */
+            border-radius: 1.5rem;
+            padding: 2.5rem;
+            width: 100%;
+            max-width: 1200px;
+            box-shadow: 0 15px 30px -5px rgba(0, 0, 0, 0.1), 0 5px 15px -2px rgba(0, 0, 0, 0.05);
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2rem;
+        }
+        @media (min-width: 1024px) {
+            .app-card {
+                grid-template-columns: 2fr 1fr;
+            }
+        }
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+        .code-editor-container {
+            background-color: #f7fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 1rem;
+            padding: 1rem;
+            min-height: 400px;
+            display: flex;
+            flex-direction: column;
+        }
+        .CodeMirror {
+            border: 1px solid #e2e8f0;
+            height: auto;
+            min-height: 350px;
+            border-radius: 0.75rem;
+            font-size: 14px;
+        }
+        .code-output-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        .copy-btn, .save-btn, .delete-btn, .load-btn {
+            background-color: #cbd5e0; /* Botão de copiar em cinza */
+            color: #4a5568;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .save-btn { background-color: #38a169; color: white; }
+        .delete-btn { background-color: #e53e3e; color: white; }
+        .load-btn { background-color: #4299e1; color: white; }
+
+        .copy-btn:hover:not(:disabled) { background-color: #a0aec0; }
+        .save-btn:hover:not(:disabled) { background-color: #2f855a; }
+        .delete-btn:hover:not(:disabled) { background-color: #c53030; }
+        .load-btn:hover:not(:disabled) { background-color: #3182ce; }
+
+        .loading-dots span {
+            animation: bounce 1.4s infinite ease-in-out both;
+            display: inline-block;
+            margin: 0 2px;
+        }
+        .loading-dots span:nth-child(1) { animation-delay: -0.32s; }
+        .loading-dots span:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes bounce {
+            0%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-8px); }
+        }
+        input, select {
+            background-color: #f7fafc;
+            border: 1px solid #e2e8f0;
+            color: #1a202c;
+            padding: 0.75rem 1rem;
+            border-radius: 0.75rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        input:focus, select:focus {
+            border-color: #48bb78; /* Verde para o foco */
+            box-shadow: 0 0 0 2px rgba(72, 187, 120, 0.2);
+        }
+        button {
+            background-color: #48bb78; /* Botão principal em verde vibrante */
+            color: white;
+            font-weight: 600;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.75rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        button:hover:not(:disabled) { background-color: #38a169; }
+        button:disabled { background-color: #a0aec0; cursor: not-allowed; }
+        .message-box {
+            background-color: #fefcbf;
+            border: 1px solid #fbd38d;
+            color: #9c4221;
+            padding: 1rem;
+            border-radius: 0.75rem;
+            margin-top: 1.5rem;
+            display: none; /* Inicia oculto */
+        }
+        .script-list-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            background-color: #f7fafc;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            border: 1px solid #e2e8f0;
+        }
+        .script-list-item:hover { background-color: #edf2f7; }
+        .script-list-item-name { font-weight: 600; color: #2d3748; }
+        .script-list-item-buttons { display: flex; gap: 0.5rem; }
+        .confirmation-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            transition: opacity 0.3s ease;
+        }
+        .modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 1rem;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+    <!-- CodeMirror para o editor de código -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+    <main class="main-container">
+        <div class="app-card">
+            <div class="col-span-1 lg:col-span-2">
+                <h1 class="text-3xl font-bold text-center mb-2 text-gray-800">Hub de Scripts Multi-Linguagem</h1>
+                <p class="text-center text-gray-600 mb-4 text-sm md:text-base"> Gere, edite e salve seus scripts com a ajuda da IA. </p>
+                <div class="text-center mb-4 text-sm md:text-base">
+                    <span id="user-id-display" class="font-mono text-gray-400 text-xs">ID do usuário: Carregando...</span>
+                </div>
+            </div>
+            <div class="input-group">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="flex flex-col">
+                        <label for="language-select" class="text-sm font-medium text-gray-700 mb-1">Linguagem</label>
+                        <select id="language-select" class="w-full">
+                            <option value="lua">Lua</option>
+                            <option value="python">Python</option>
+                            <option value="javascript">JavaScript</option>
+                            <option value="csharp">C#</option>
+                            <option value="java">Java</option>
+                        </select>
+                    </div>
+                    <div class="flex flex-col">
+                        <label for="prompt-input" class="text-sm font-medium text-gray-700 mb-1">Descreva o Script</label>
+                        <input type="text" id="prompt-input" class="w-full" placeholder="Ex: 'Crie um script de auto-farm para Blox Fruits.'">
+                    </div>
+                </div>
+                <div class="flex flex-col">
+                    <label class="text-sm font-medium text-gray-700 mb-1">Opções de Geração</label>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="flex items-center gap-2">
+                            <input type="checkbox" id="add-comments" class="rounded text-green-500 focus:ring-green-500">
+                            <label for="add-comments" class="text-sm text-gray-700">Adicionar Comentários ao Código</label>
+                        </div>
+                        <div class="flex flex-col">
+                            <label for="creativity-select" class="text-sm text-gray-700 mb-1">Criatividade da IA</label>
+                            <select id="creativity-select" class="w-full">
+                                <option value="0.4">Baixa</option>
+                                <option value="0.8" selected>Média</option>
+                                <option value="1.2">Alta</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex flex-col md:flex-row justify-between gap-4">
+                    <button id="generate-button" class="w-full md:w-auto">Gerar Script</button>
+                    <button id="clear-button" class="w-full md:w-auto bg-gray-600 hover:bg-gray-700">Limpar Tudo</button>
+                </div>
+                <hr class="my-4">
+                <div class="flex flex-col">
+                    <label for="script-name-input" class="text-sm font-medium text-gray-700 mb-1">Salvar Script</label>
+                    <div class="flex gap-4">
+                        <input type="text" id="script-name-input" class="w-full" placeholder="Nome do Script (ex: 'AutoFarmBloxFruits')">
+                        <button id="save-button" class="save-btn whitespace-nowrap">Salvar</button>
+                    </div>
+                </div>
+            </div>
+            <div class="code-editor-container">
+                <div class="code-output-header">
+                    <h2 class="text-xl font-semibold text-gray-800">Editor de Código</h2>
+                    <div class="flex gap-2">
+                        <button id="copy-button" class="copy-btn">Copiar</button>
+                    </div>
+                </div>
+                <div id="loading-editor" class="text-center my-4 hidden">
+                    <p class="text-gray-600 text-lg">Carregando editor...</p>
+                    <div class="loading-dots text-green-500 text-3xl"><span>.</span><span>.</span><span>.</span></div>
+                </div>
+                <div id="code-editor"></div>
+            </div>
+            <div id="loading-indicator" class="text-center my-4 hidden col-span-1 lg:col-span-2">
+                <p class="text-gray-600 text-lg">Gerando script...</p>
+                <div class="loading-dots text-green-500 text-3xl"><span>.</span><span>.</span><span>.</span></div>
+            </div>
+            <div id="message-box" class="message-box col-span-1 lg:col-span-2" role="alert" aria-live="polite"></div>
+            <div class="col-span-1 lg:col-span-2 mt-4">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">Meus Scripts Salvos</h2>
+                <div id="script-list" class="flex flex-col gap-2">
+                    <p class="text-gray-500 text-center">Nenhum script salvo ainda.</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal de Confirmação de Exclusão -->
+    <div id="delete-confirmation-modal" class="confirmation-modal hidden">
+        <div class="modal-content">
+            <h3 class="text-lg font-bold mb-4">Confirmar Exclusão</h3>
+            <p>Tem certeza de que deseja excluir o script "<span id="script-to-delete-name"></span>"?</p>
+            <div class="mt-6 flex justify-center gap-4">
+                <button id="confirm-delete-btn" class="delete-btn">Excluir</button>
+                <button id="cancel-delete-btn" class="copy-btn">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts do CodeMirror -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/lua/lua.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/python/python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/javascript/javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/clike/clike.min.js"></script>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, addDoc, deleteDoc, onSnapshot, collection, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Variáveis globais fornecidas pelo ambiente do canvas.
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        
+        let db, auth, userId, codeEditor;
+
+        // Função para inicializar o Firebase e o aplicativo
+        async function initFirebase() {
+            try {
+                const app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+
+                // Autentica o usuário com token personalizado ou de forma anônima
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                // Ouve as mudanças no estado de autenticação
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        console.log("Firebase Auth OK. User ID:", userId);
+                        initApp();
+                    } else {
+                        console.log("Firebase Auth state changed to signed out.");
+                        // Não há necessidade de exibir uma mensagem aqui, o onSnapshot lidará com o estado
+                    }
+                });
+            } catch (error) {
+                console.error("Erro ao inicializar Firebase:", error);
+                showMessage(`Erro ao inicializar o banco de dados. Tente novamente mais tarde.`, true);
+            }
+        }
+
+        // Função para inicializar a lógica da aplicação após o Firebase estar pronto
+        function initApp() {
+            // Inicializa as variáveis DOM uma vez para otimização
+            const languageSelect = document.getElementById('language-select');
+            const promptInput = document.getElementById('prompt-input');
+            const generateButton = document.getElementById('generate-button');
+            const clearButton = document.getElementById('clear-button');
+            const addCommentsCheckbox = document.getElementById('add-comments');
+            const creativitySelect = document.getElementById('creativity-select');
+            const scriptNameInput = document.getElementById('script-name-input');
+            const saveButton = document.getElementById('save-button');
+            const copyButton = document.getElementById('copy-button');
+            const loadingIndicator = document.getElementById('loading-indicator');
+            const messageBox = document.getElementById('message-box');
+            const scriptListElement = document.getElementById('script-list');
+            const userIdDisplay = document.getElementById('user-id-display');
+            
+            // Exibir o ID do usuário
+            userIdDisplay.innerText = `ID do usuário: ${userId}`;
+
+            const editorContainer = document.getElementById('code-editor');
+            const loadingEditor = document.getElementById('loading-editor');
+
+            // Esconde o indicador de carregamento do editor e o mostra
+            loadingEditor.classList.add('hidden');
+            editorContainer.style.display = 'block';
+
+            // Função para configurar o CodeMirror com a linguagem correta
+            const setupCodeMirror = (language) => {
+                const modeMap = {
+                    'lua': 'lua',
+                    'python': 'python',
+                    'javascript': 'javascript',
+                    'csharp': 'clike',
+                    'java': 'clike'
+                };
+                // Limpa qualquer instância de editor existente
+                if (codeEditor) {
+                    codeEditor.toTextArea();
+                }
+                codeEditor = CodeMirror(editorContainer, {
+                    value: '',
+                    mode: modeMap[language] || 'lua',
+                    lineNumbers: true,
+                    theme: 'default',
+                    tabSize: 4,
+                    indentUnit: 4,
+                    extraKeys: { "Ctrl-Space": "autocomplete" }
+                });
+            };
+            
+            // Define o modo inicial e adiciona o listener de mudança
+            setupCodeMirror(languageSelect.value);
+            languageSelect.addEventListener('change', (event) => {
+                const newLanguage = event.target.value;
+                setupCodeMirror(newLanguage);
+            });
+
+            // Adiciona listeners para os botões e inputs
+            generateButton.addEventListener('click', generateScript);
+            clearButton.addEventListener('click', clearApp);
+            copyButton.addEventListener('click', copyCode);
+            saveButton.addEventListener('click', saveScript);
+            promptInput.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    generateScript();
+                }
+            });
+
+            // Inicia o listener em tempo real para os scripts salvos no Firestore
+            setupScriptListListener(scriptListElement);
+
+            // Função para exibir mensagens na caixa de feedback
+            function showMessage(text, isError = false) {
+                messageBox.innerText = text;
+                messageBox.style.display = 'block';
+                if (isError) {
+                    messageBox.style.backgroundColor = '#fef2f2';
+                    messageBox.style.borderColor = '#fca5a5';
+                    messageBox.style.color = '#dc2626';
+                } else {
+                    messageBox.style.backgroundColor = '#fefcbf';
+                    messageBox.style.borderColor = '#fbd38d';
+                    messageBox.style.color = '#9c4221';
+                }
+            }
+
+            // Função para copiar o código para a área de transferência
+            function copyCode() {
+                try {
+                    const code = codeEditor.getValue();
+                    const textarea = document.createElement('textarea');
+                    textarea.value = code;
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textarea);
+                    showMessage('Código copiado para a área de transferência!');
+                } catch (err) {
+                    console.error('Erro ao copiar o código:', err);
+                    showMessage('Erro ao copiar o código. Tente novamente.', true);
+                }
+            }
+
+            // Função para limpar todos os campos e o editor
+            function clearApp() {
+                promptInput.value = '';
+                scriptNameInput.value = '';
+                codeEditor.setValue('');
+                showMessage('');
+                generateButton.disabled = false;
+                clearButton.disabled = false;
+                loadingIndicator.classList.add('hidden');
+                saveButton.disabled = false;
+            }
+
+            // Função para gerar o script com a IA, com tentativas e espera exponencial
+            async function generateScript() {
+                const userDescription = promptInput.value.trim();
+                if (userDescription === '') {
+                    showMessage('Por favor, preencha a descrição do script.', true);
+                    return;
+                }
+
+                showMessage('');
+                loadingIndicator.classList.remove('hidden');
+                generateButton.disabled = true;
+                clearButton.disabled = true;
+
+                const maxRetries = 3;
+                let retryCount = 0;
+                let lastError = null;
+                const selectedLanguage = languageSelect.value;
+                const addComments = addCommentsCheckbox.checked;
+                const creativityTemperature = parseFloat(creativitySelect.value);
+
+                const systemInstruction = addComments
+                    ? "Você é um hub de scripts profissional. Gere um script funcional na linguagem de programação solicitada com comentários detalhados explicando cada parte do código. Gere APENAS o código completo."
+                    : "Você é um hub de scripts profissional. Gere um script funcional na linguagem de programação solicitada. Gere APENAS o código completo, sem comentários ou texto adicional.";
+
+                const fullPrompt = `A linguagem de programação é ${selectedLanguage}. A solicitação do usuário é: "${userDescription}".`;
+
+                while (retryCount < maxRetries) {
+                    try {
+                        const payload = {
+                            contents: [{ parts: [{ text: fullPrompt }] }],
+                            generationConfig: { temperature: creativityTemperature },
+                            systemInstruction: { parts: [{ text: systemInstruction }] }
+                        };
+
+                        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+
+                        if (!response.ok) {
+                            const errorData = await response.json();
+                            throw new Error(`Erro na API: ${response.status} ${response.statusText}. Detalhes: ${JSON.stringify(errorData)}`);
+                        }
+
+                        const result = await response.json();
+                        if (!result.candidates || result.candidates.length === 0) {
+                            throw new Error('A sua descrição pode ter ativado os filtros de segurança da IA. Por favor, tente reformular o seu pedido.');
+                        }
+                        const aiResponse = result.candidates[0].content.parts[0].text;
+                        codeEditor.setValue(aiResponse);
+                        showMessage('Script gerado com sucesso!');
+                        break; // Sai do loop se for bem-sucedido
+                    } catch (error) {
+                        lastError = error;
+                        retryCount++;
+                        const delay = Math.pow(2, retryCount) * 1000;
+                        if (retryCount <= maxRetries) {
+                            await new Promise(resolve => setTimeout(resolve, delay));
+                        }
+                    }
+                }
+
+                loadingIndicator.classList.add('hidden');
+                generateButton.disabled = false;
+                clearButton.disabled = false;
+
+                if (retryCount >= maxRetries) {
+                    showMessage(`Erro: Não foi possível gerar o script após ${maxRetries} tentativas. Detalhes: ${lastError.message}`, true);
+                }
+            }
+
+            // Função para salvar o script no Firestore
+            async function saveScript() {
+                if (!userId) {
+                    showMessage('Erro: Usuário não autenticado. Tente recarregar a página.', true);
+                    return;
+                }
+                const scriptName = scriptNameInput.value.trim();
+                const code = codeEditor.getValue();
+
+                if (!scriptName) {
+                    showMessage('Por favor, digite um nome para o script.', true);
+                    return;
+                }
+
+                saveButton.disabled = true;
+                saveButton.innerText = 'Salvando...';
+
+                try {
+                    // Usa addDoc para gerar um ID automático
+                    const collectionRef = collection(db, `artifacts/${appId}/users/${userId}/scripts`);
+                    await addDoc(collectionRef, {
+                        name: scriptName,
+                        code: code,
+                        timestamp: new Date().getTime()
+                    });
+                    showMessage(`Script '${scriptName}' salvo com sucesso!`);
+                    scriptNameInput.value = ''; // Limpa o campo após salvar
+                } catch (e) {
+                    console.error("Erro ao salvar o script: ", e);
+                    showMessage("Erro ao salvar o script. Tente novamente.", true);
+                } finally {
+                    saveButton.disabled = false;
+                    saveButton.innerText = 'Salvar';
+                }
+            }
+
+            // Função para carregar o script no CodeMirror
+            async function loadScript(scriptDocId, buttonElement) {
+                if (!userId) {
+                    showMessage('Erro: Usuário não autenticado. Tente recarregar a página.', true);
+                    return;
+                }
+                
+                buttonElement.disabled = true;
+                const originalText = buttonElement.innerText;
+                buttonElement.innerText = 'Carregando...';
+
+                try {
+                    const docRef = doc(db, `artifacts/${appId}/users/${userId}/scripts`, scriptDocId);
+                    const docSnap = await getDoc(docRef);
+
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        codeEditor.setValue(data.code);
+                        scriptNameInput.value = data.name;
+                        showMessage(`Script '${data.name}' carregado.`, false);
+                    } else {
+                        showMessage("Script não encontrado.", true);
+                    }
+                } catch (e) {
+                    console.error("Erro ao carregar o script: ", e);
+                    showMessage("Erro ao carregar o script. Tente novamente.", true);
+                } finally {
+                    buttonElement.disabled = false;
+                    buttonElement.innerText = originalText;
+                }
+            }
+
+            // Função para deletar um script
+            function showDeleteConfirmation(scriptDocId, scriptName, buttonElement) {
+                const modal = document.getElementById('delete-confirmation-modal');
+                const scriptToDeleteName = document.getElementById('script-to-delete-name');
+                const confirmBtn = document.getElementById('confirm-delete-btn');
+                const cancelBtn = document.getElementById('cancel-delete-btn');
+                
+                scriptToDeleteName.textContent = scriptName;
+                modal.classList.remove('hidden');
+
+                // Garante que o listener seja adicionado apenas uma vez
+                const handleConfirm = async () => {
+                    await deleteScript(scriptDocId, buttonElement);
+                    modal.classList.add('hidden');
+                    confirmBtn.removeEventListener('click', handleConfirm);
+                    cancelBtn.removeEventListener('click', handleCancel);
+                };
+
+                const handleCancel = () => {
+                    modal.classList.add('hidden');
+                    confirmBtn.removeEventListener('click', handleConfirm);
+                    cancelBtn.removeEventListener('click', handleCancel);
+                };
+
+                confirmBtn.addEventListener('click', handleConfirm);
+                cancelBtn.addEventListener('click', handleCancel);
+            }
+            
+            async function deleteScript(scriptDocId, buttonElement) {
+                if (!userId) {
+                    showMessage('Erro: Usuário não autenticado. Tente recarregar a página.', true);
+                    return;
+                }
+
+                buttonElement.disabled = true;
+                const originalText = buttonElement.innerText;
+                buttonElement.innerText = 'Excluindo...';
+
+                try {
+                    await deleteDoc(doc(db, `artifacts/${appId}/users/${userId}/scripts`, scriptDocId));
+                    showMessage(`Script excluído com sucesso.`, false);
+                } catch (e) {
+                    console.error("Erro ao excluir o script:", e);
+                    showMessage("Erro ao excluir o script. Tente novamente.", true);
+                } finally {
+                    buttonElement.disabled = false;
+                    buttonElement.innerText = originalText;
+                }
+            }
+
+
+            // Função para configurar o listener em tempo real para a lista de scripts
+            function setupScriptListListener(scriptListElement) {
+                if (!userId) {
+                    console.warn("Usuário não autenticado. O listener de scripts não será ativado.");
+                    return;
+                }
+                // Usa onSnapshot para atualizações em tempo real
+                const q = query(collection(db, `artifacts/${appId}/users/${userId}/scripts`), orderBy("timestamp"));
+
+                onSnapshot(q, (snapshot) => {
+                    scriptListElement.innerHTML = '';
+                    if (snapshot.empty) {
+                        scriptListElement.innerHTML = `<p class="text-gray-500 text-center">Nenhum script salvo ainda.</p>`;
+                        return;
+                    }
+
+                    snapshot.forEach((doc) => {
+                        const script = doc.data();
+                        const scriptItem = document.createElement('div');
+                        scriptItem.className = "script-list-item";
+                        scriptItem.innerHTML = `
+                            <span class="script-list-item-name">${script.name}</span>
+                            <div class="script-list-item-buttons">
+                                <button class="load-btn">Carregar</button>
+                                <button class="delete-btn">Excluir</button>
+                            </div>
+                        `;
+                        // Adiciona os listeners usando o ID gerado pelo Firestore
+                        scriptItem.querySelector('.load-btn').addEventListener('click', (event) => {
+                            loadScript(doc.id, event.target);
+                        });
+                        scriptItem.querySelector('.delete-btn').addEventListener('click', (event) => {
+                            showDeleteConfirmation(doc.id, script.name, event.target);
+                        });
+                        scriptListElement.appendChild(scriptItem);
+                    });
+                });
+            }
+        }
+        
+        // Inicia o processo de inicialização do Firebase quando a página é carregada
+        window.onload = initFirebase;
+    </script>
+</body>
+</html>
