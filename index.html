@@ -270,7 +270,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, addDoc, deleteDoc, onSnapshot, collection, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, addDoc, deleteDoc, onSnapshot, collection, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Variáveis globais fornecidas pelo ambiente do canvas.
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
@@ -469,14 +469,18 @@
 
                         if (!response.ok) {
                             const errorData = await response.json();
-                            throw new Error(`Erro na API: ${response.status} ${response.statusText}. Detalhes: ${JSON.stringify(errorData)}`);
+                            console.error(`Erro na API: ${response.status} ${response.statusText}. Detalhes:`, errorData);
+                            throw new Error(`Erro na API: ${response.status} ${response.statusText}`);
                         }
 
                         const result = await response.json();
-                        if (!result.candidates || result.candidates.length === 0) {
+                        const aiResponse = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+                        
+                        if (!aiResponse) {
+                             // Lançar um erro mais específico para a caixa de mensagem
                             throw new Error('A sua descrição pode ter ativado os filtros de segurança da IA. Por favor, tente reformular o seu pedido.');
                         }
-                        const aiResponse = result.candidates[0].content.parts[0].text;
+                        
                         codeEditor.setValue(aiResponse);
                         showMessage('Script gerado com sucesso!');
                         break; // Sai do loop se for bem-sucedido
@@ -495,7 +499,7 @@
                 clearButton.disabled = false;
 
                 if (retryCount >= maxRetries) {
-                    showMessage(`Erro: Não foi possível gerar o script após ${maxRetries} tentativas. Detalhes: ${lastError.message}`, true);
+                    showMessage(`Erro: Não foi possível gerar o script. Motivo: ${lastError.message}`, true);
                 }
             }
 
@@ -624,8 +628,9 @@
                     console.warn("Usuário não autenticado. O listener de scripts não será ativado.");
                     return;
                 }
-                // Usa onSnapshot para atualizações em tempo real
-                const q = query(collection(db, `artifacts/${appId}/users/${userId}/scripts`), orderBy("timestamp"));
+                // Usa onSnapshot para atualizações em tempo real.
+                // A ordenação por "timestamp" foi removida para evitar erros de índice.
+                const q = query(collection(db, `artifacts/${appId}/users/${userId}/scripts`));
 
                 onSnapshot(q, (snapshot) => {
                     scriptListElement.innerHTML = '';
@@ -634,8 +639,11 @@
                         return;
                     }
 
-                    snapshot.forEach((doc) => {
-                        const script = doc.data();
+                    // Transforma os documentos em um array e ordena-os por timestamp no lado do cliente
+                    const scripts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    scripts.sort((a, b) => a.timestamp - b.timestamp);
+
+                    scripts.forEach((script) => {
                         const scriptItem = document.createElement('div');
                         scriptItem.className = "script-list-item";
                         scriptItem.innerHTML = `
@@ -647,10 +655,10 @@
                         `;
                         // Adiciona os listeners usando o ID gerado pelo Firestore
                         scriptItem.querySelector('.load-btn').addEventListener('click', (event) => {
-                            loadScript(doc.id, event.target);
+                            loadScript(script.id, event.target);
                         });
                         scriptItem.querySelector('.delete-btn').addEventListener('click', (event) => {
-                            showDeleteConfirmation(doc.id, script.name, event.target);
+                            showDeleteConfirmation(script.id, script.name, event.target);
                         });
                         scriptListElement.appendChild(scriptItem);
                     });
@@ -663,3 +671,4 @@
     </script>
 </body>
 </html>
+
